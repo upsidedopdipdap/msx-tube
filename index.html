@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Piped MSX</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #fff;
+            font-family: sans-serif;
+            margin: 0;
+            overflow: hidden; /* Hide scrollbars for TV */
+        }
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            padding: 40px;
+        }
+        .card {
+            background: #2d2d2d;
+            border: 3px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .card:focus {
+            border-color: #00aaff;
+            transform: scale(1.05);
+            outline: none;
+            background: #3d3d3d;
+        }
+        .card img {
+            width: 100%;
+            border-radius: 6px 6px 0 0;
+        }
+        .title {
+            padding: 10px;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #player {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: black;
+            display: none;
+            z-index: 100;
+        }
+        video { width: 100%; height: 100%; }
+    </style>
+</head>
+<body>
+
+<div id="grid"></div>
+
+<div id="player">
+    <video id="videoElement" controls></video>
+</div>
+
+<script>
+    const API_BASE = 'https://pipedapi.kavin.rocks'; // Public Instance
+    let videos = [];
+    let isPlaying = false;
+
+    // 1. Fetch Trending Videos
+    async function init() {
+        try {
+            const res = await fetch(`${API_BASE}/trending?region=US`);
+            const data = await res.json();
+            videos = data;
+            render();
+        } catch (e) {
+            document.body.innerHTML = "<h1>Error loading Piped API</h1>";
+        }
+    }
+
+    // 2. Render Grid
+    function render() {
+        const grid = document.getElementById('grid');
+        grid.innerHTML = videos.map((v, index) => `
+            <div class="card" tabindex="0" data-id="${v.url.split('=')[1]}">
+                <img src="${v.thumbnail}" alt="">
+                <div class="title">${v.title}</div>
+            </div>
+        `).join('');
+        
+        // Focus first item for TV navigation
+        if (grid.children.length > 0) grid.children[0].focus();
+    }
+
+    // 3. Handle Spatial Navigation (Remote Control)
+    document.addEventListener('keydown', (e) => {
+        if (isPlaying) {
+            handlePlayerKeys(e);
+            return;
+        }
+
+        const focused = document.activeElement;
+        const cards = Array.from(document.querySelectorAll('.card'));
+        const index = cards.indexOf(focused);
+        const cols = 4; // Must match CSS grid columns
+
+        switch(e.key) {
+            case 'ArrowRight': 
+                if(index + 1 < cards.length) cards[index + 1].focus(); 
+                break;
+            case 'ArrowLeft': 
+                if(index - 1 >= 0) cards[index - 1].focus(); 
+                break;
+            case 'ArrowDown': 
+                if(index + cols < cards.length) cards[index + cols].focus(); 
+                break;
+            case 'ArrowUp': 
+                if(index - cols >= 0) cards[index - cols].focus(); 
+                break;
+            case 'Enter': 
+                if(index !== -1) playVideo(focused.dataset.id); 
+                break;
+        }
+    });
+
+    // 4. Player Logic
+    async function playVideo(id) {
+        const player = document.getElementById('player');
+        const videoEl = document.getElementById('videoElement');
+        
+        // Fetch stream URL
+        try {
+            const res = await fetch(`${API_BASE}/streams/${id}`);
+            const data = await res.json();
+            // Find a standard MP4 stream (ignoring complex DASH/HLS for simplicity)
+            const stream = data.videoStreams.find(s => s.format === 'MPEG-4');
+            
+            if (stream) {
+                videoEl.src = stream.url;
+                player.style.display = 'block';
+                videoEl.play();
+                isPlaying = true;
+                videoEl.focus();
+            }
+        } catch(e) {
+            console.error("Stream error", e);
+        }
+    }
+
+    function handlePlayerKeys(e) {
+        const videoEl = document.getElementById('videoElement');
+        // Backspace (8) or Escape (27) to close player
+        if (e.keyCode === 8 || e.keyCode === 27 || e.key === 'Back') {
+            e.preventDefault();
+            videoEl.pause();
+            videoEl.src = "";
+            document.getElementById('player').style.display = 'none';
+            isPlaying = false;
+            document.querySelector('.card').focus(); // Return focus to grid
+        }
+        // Enter to Pause/Play
+        if (e.key === 'Enter') {
+            videoEl.paused ? videoEl.play() : videoEl.pause();
+        }
+    }
+
+    init();
+</script>
+</body>
+</html>

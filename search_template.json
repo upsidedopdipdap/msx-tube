@@ -1,0 +1,16 @@
+{
+  "name": "MSX Tube Search",
+  "type": "list",
+  "search": {
+    "action": "content:http://localhost:3000/search?q={query}",
+    "label": "Search YouTube..."
+  },
+  "items": [
+    {
+      "title": "Search",
+      "label": "Enter a keyword",
+      "image": "https://img.icons8.com/m_rounded/200/search.png",
+      "action": "content:http://localhost:3000/search?q=funny%20cats"
+    }
+  ]
+}

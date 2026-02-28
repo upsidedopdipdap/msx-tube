@@ -1,0 +1,29 @@
+{
+  "name": "MSX Tube Proxy",
+  "background": "https://upload.wikimedia.org/wikipedia/commons/e/e1/Logo_of_YouTube_%282015-2017%29.svg",
+  "menu": [
+    {
+      "title": "Home",
+      "action": "content:http://localhost:3000/home",
+      "image": "https://img.icons8.com/m_rounded/200/home.png"
+    },
+    {
+      "title": "Trending",
+      "action": "content:http://localhost:3000/trending",
+      "image": "https://img.icons8.com/m_rounded/200/fire.png"
+    },
+    {
+      "title": "Search",
+      "action": "content:search_template.json",
+      "image": "https://img.icons8.com/m_rounded/200/search.png"
+    }
+  ],
+  "items": [
+    {
+      "title": "Welcome to MSX Tube",
+      "label": "Select a category to begin",
+      "image": "https://upload.wikimedia.org/wikipedia/commons/e/e1/Logo_of_YouTube_%282015-2017%29.svg",
+      "action": "content:http://localhost:3000/home"
+    }
+  ]
+}

@@ -3,310 +3,324 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Piped MSX Player</title>
+    <title>MSX Piped Player</title>
     <style>
+        :root { --bg: #121212; --card: #1e1e1e; --focus: #3ea6ff; --text: #fff; }
         body {
-            background-color: #121212;
-            color: #e0e0e0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            overflow: hidden;
+            background-color: var(--bg); color: var(--text);
+            font-family: 'Segoe UI', sans-serif; margin: 0; overflow: hidden;
         }
-        /* Status Bar */
-        #status {
-            position: fixed; top: 20px; right: 40px;
-            font-size: 12px; color: #888;
-            z-index: 50;
+        
+        /* LAYOUT */
+        #app { display: flex; flex-direction: column; height: 100vh; }
+        #header { 
+            padding: 20px 40px; display: flex; justify-content: space-between; align-items: center;
+            background: #000; box-shadow: 0 2px 10px rgba(0,0,0,0.5); z-index: 20;
         }
-        /* Grid Layout */
+        .btn {
+            padding: 10px 20px; background: #333; border: 2px solid transparent;
+            border-radius: 4px; color: #fff; margin-left: 10px; cursor: pointer;
+        }
+        .btn:focus { border-color: var(--focus); background: #444; outline: none; }
+        
         #grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 25px;
-            padding: 60px 40px;
-            height: 100vh;
-            box-sizing: border-box;
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 25px;
+            padding: 30px 40px; overflow-y: auto; flex: 1;
         }
-        /* Video Card */
+        
+        /* CARDS */
         .card {
-            background: #1e1e1e;
-            border: 4px solid transparent;
-            border-radius: 12px;
-            display: flex;
-            flex-direction: column;
-            transition: transform 0.15s ease, border-color 0.15s;
-            position: relative;
+            background: var(--card); border: 4px solid transparent; border-radius: 12px;
+            display: flex; flex-direction: column; position: relative;
+            transition: transform 0.2s;
         }
         .card:focus {
-            border-color: #3ea6ff;
-            transform: scale(1.05);
-            outline: none;
-            background: #2a2a2a;
-            z-index: 10;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border-color: var(--focus); transform: scale(1.02);
+            z-index: 10; background: #2a2a2a; outline: none;
         }
-        .thumb-container {
-            position: relative;
-            width: 100%;
-            padding-top: 56.25%; /* 16:9 Aspect Ratio */
-            overflow: hidden;
-            border-radius: 8px 8px 0 0;
-            background: #000;
+        .thumb {
+            width: 100%; aspect-ratio: 16/9; background: #000;
+            border-radius: 8px 8px 0 0; object-fit: cover;
         }
-        .card img {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            object-fit: cover;
-        }
-        .duration {
-            position: absolute;
-            bottom: 8px; right: 8px;
-            background: rgba(0,0,0,0.8);
-            color: white;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-        .info {
-            padding: 12px;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
+        .info { padding: 12px; }
         .title {
-            font-size: 16px;
-            font-weight: 600;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            line-height: 1.3;
+            font-size: 16px; font-weight: 600; display: -webkit-box;
+            -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
         }
-        .channel {
-            margin-top: 8px;
-            font-size: 13px;
-            color: #aaa;
-        }
-
-        /* Player Overlay */
-        #player {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: black;
-            display: none;
-            z-index: 100;
-        }
-        video { width: 100%; height: 100%; outline: none; }
         
-        /* Loading/Error State */
-        #loader {
-            position: fixed; top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 24px;
-            text-align: center;
+        /* SETTINGS MODAL */
+        #modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 100; display: none;
+            justify-content: center; align-items: center; flex-direction: column;
+        }
+        #modal.active { display: flex; }
+        .input-group { margin: 20px; text-align: center; }
+        input {
+            padding: 10px; width: 400px; font-size: 18px; background: #222;
+            border: 2px solid #444; color: white; text-align: center;
+        }
+        input:focus { border-color: var(--focus); outline: none; }
+        
+        /* PLAYER */
+        #player {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: black; display: none; z-index: 200;
+        }
+        video { width: 100%; height: 100%; }
+        
+        #toast {
+            position: fixed; bottom: 30px; right: 30px; background: #333;
+            padding: 10px 20px; border-radius: 4px; font-size: 14px; opacity: 0;
+            transition: opacity 0.5s; z-index: 300;
         }
     </style>
 </head>
 <body>
 
-<div id="status">Connecting...</div>
-<div id="loader">Loading Trending...</div>
-<div id="grid"></div>
-
-<div id="player">
-    <video id="videoElement" controls></video>
+<div id="app">
+    <div id="header">
+        <div id="status">Initializing...</div>
+        <div>
+            <div id="btn-refresh" class="btn" tabindex="0">Refresh</div>
+            <div id="btn-settings" class="btn" tabindex="0">Settings</div>
+        </div>
+    </div>
+    <div id="grid"></div>
 </div>
 
+<!-- Settings Modal -->
+<div id="modal">
+    <h2>Custom API Instance</h2>
+    <p>Enter a Piped URL (e.g., https://api.piped.pw)</p>
+    <div class="input-group">
+        <input type="text" id="api-input" tabindex="0" placeholder="https://...">
+    </div>
+    <div>
+        <div id="btn-save" class="btn" tabindex="0">Save & Reload</div>
+        <div id="btn-cancel" class="btn" tabindex="0">Cancel</div>
+    </div>
+</div>
+
+<!-- Video Player -->
+<div id="player">
+    <video id="videoEl" controls></video>
+</div>
+
+<!-- Toast Notification -->
+<div id="toast"></div>
+
 <script>
-    // --- CONFIGURATION ---
-    const PROXY = 'https://corsproxy.io/?'; // Fixes CORS issues
-    const REGION = 'US';
+    // --- CONFIG ---
+    // New Proxy: AllOrigins is more permissive than CorsProxy.io
+    const PROXY_BASE = 'https://api.allorigins.win/raw?url='; 
     
-    // List of APIs to try in order (Availability varies)
-    const API_LIST = [
+    const DEFAULTS = [
         'https://pipedapi.kavin.rocks',
-        'https://piped-api.privacy.com.de',
-        'https://api.piped.pw',
-        'https://pipedapi.r4fo.com'
+        'https://api.piped.pw', 
+        'https://api-piped.mha.fi',
+        'https://pipedapi.tokhmi.xyz',
+        'https://pipedapi.system41.science'
     ];
 
-    let currentApiIndex = 0;
-    let activeApi = '';
-    let videos = [];
-    let isPlaying = false;
+    let state = {
+        api: localStorage.getItem('piped_api') || DEFAULTS[0],
+        videos: [],
+        view: 'grid' // grid, player, modal
+    };
 
-    // --- 1. ROBUST FETCH (Auto-Retry + Proxy) ---
-    async function robustFetch(endpoint) {
-        const target = activeApi + endpoint;
-        
-        // Attempt 1: Direct Access
-        try {
-            const res = await fetch(target);
-            if(res.ok) return await res.json();
-        } catch(e) { console.warn(`Direct access failed for ${target}`); }
+    // --- CORE FUNCTIONS ---
 
-        // Attempt 2: Via Proxy
-        try {
-            console.log(`Trying proxy for ${target}`);
-            const res = await fetch(PROXY + encodeURIComponent(target));
-            if(res.ok) return await res.json();
-        } catch(e) { console.warn(`Proxy failed for ${target}`); }
-
-        throw new Error("Fetch failed");
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.innerText = msg; t.style.opacity = 1;
+        setTimeout(() => t.style.opacity = 0, 3000);
     }
 
-    // --- 2. INITIALIZATION ---
-    async function init() {
-        const status = document.getElementById('status');
-        const loader = document.getElementById('loader');
-        
-        // Cycle through APIs until one works
-        for (let i = 0; i < API_LIST.length; i++) {
-            activeApi = API_LIST[i];
-            status.innerText = `Trying: ${activeApi.replace('https://', '')}`;
-            try {
-                // Test fetch trending
-                videos = await robustFetch(`/trending?region=${REGION}`);
-                status.innerText = `Connected: ${activeApi.replace('https://', '')}`;
-                loader.style.display = 'none';
-                render();
-                return; // Success!
-            } catch (e) {
-                console.error(`API ${activeApi} failed.`);
-            }
-        }
-        
-        loader.innerHTML = "❌ All APIs Failed.<br>Try reloading later.";
+    function setStatus(msg) {
+        document.getElementById('status').innerText = `${msg} (${state.api.replace('https://', '')})`;
     }
 
-    // --- 3. RENDER UI ---
-    function render() {
+    // Smart Fetcher: Tries Direct -> Then Proxy -> Then Fail
+    async function fetchSmart(endpoint) {
+        const url = state.api + endpoint;
+        
+        // 1. Try Proxy (Most reliable for MSX/GitHub Pages)
+        try {
+            console.log('Fetching via proxy:', url);
+            const res = await fetch(PROXY_BASE + encodeURIComponent(url));
+            if (res.ok) return await res.json();
+        } catch(e) { console.warn('Proxy fail', e); }
+
+        // 2. Try Direct (Fallback)
+        try {
+            const res = await fetch(url);
+            if (res.ok) return await res.json();
+        } catch(e) { console.warn('Direct fail', e); }
+
+        throw new Error('Connection failed');
+    }
+
+    async function loadTrending() {
+        setStatus('Loading...');
         const grid = document.getElementById('grid');
-        grid.innerHTML = videos.map((v, i) => {
-            // Piped sometimes returns slightly different ID formats
-            const id = v.url.split('=')[1] || v.url.split('/').pop();
-            const duration = formatDuration(v.duration);
-            
+        grid.innerHTML = '';
+        
+        try {
+            state.videos = await fetchSmart('/trending?region=US');
+            renderGrid();
+            setStatus('Trending');
+            document.querySelector('.card')?.focus();
+        } catch (e) {
+            setStatus('Error connecting');
+            showToast('API Failed. Try another in Settings.');
+            autoSwitchApi(); // Try next in list
+        }
+    }
+
+    function autoSwitchApi() {
+        const currentIdx = DEFAULTS.indexOf(state.api);
+        if (currentIdx !== -1 && currentIdx < DEFAULTS.length - 1) {
+            state.api = DEFAULTS[currentIdx + 1];
+            showToast(`Switching to ${state.api}...`);
+            loadTrending();
+        }
+    }
+
+    function renderGrid() {
+        const grid = document.getElementById('grid');
+        grid.innerHTML = state.videos.map(v => {
+            const id = v.url.split('=')[1];
             return `
-            <div class="card" tabindex="0" data-id="${id}">
-                <div class="thumb-container">
-                    <img src="${v.thumbnail}" loading="lazy" alt="">
-                    <div class="duration">${duration}</div>
+                <div class="card" tabindex="0" data-id="${id}">
+                    <img class="thumb" src="${v.thumbnail}" loading="lazy">
+                    <div class="info">
+                        <div class="title">${v.title}</div>
+                    </div>
                 </div>
-                <div class="info">
-                    <div class="title">${v.title}</div>
-                    <div class="channel">${v.uploaderName}</div>
-                </div>
-            </div>
             `;
         }).join('');
-        
-        // Focus first item
-        if (grid.children.length > 0) grid.children[0].focus();
     }
 
-    // Helper: Format seconds to MM:SS
-    function formatDuration(seconds) {
-        if(!seconds) return "";
-        const m = Math.floor(seconds / 60);
-        const s = Math.floor(seconds % 60);
-        return `${m}:${s < 10 ? '0' : ''}${s}`;
+    // --- PLAYER LOGIC ---
+
+    async function playVideo(id) {
+        showToast('Fetching Stream...');
+        try {
+            const data = await fetchSmart(`/streams/${id}`);
+            // Find MPEG-4 (Compatible with TV)
+            const stream = data.videoStreams.find(s => s.format === 'MPEG-4' && s.quality === '1080p') 
+                        || data.videoStreams.find(s => s.format === 'MPEG-4');
+
+            if (stream) {
+                const video = document.getElementById('videoEl');
+                video.src = stream.url;
+                document.getElementById('player').style.display = 'block';
+                video.play();
+                video.focus();
+                state.view = 'player';
+            } else {
+                showToast('No compatible stream found');
+            }
+        } catch (e) {
+            showToast('Failed to load video stream');
+        }
     }
 
-    // --- 4. SPATIAL NAVIGATION (Remote Control) ---
+    function closePlayer() {
+        const video = document.getElementById('videoEl');
+        video.pause();
+        video.src = '';
+        document.getElementById('player').style.display = 'none';
+        state.view = 'grid';
+        document.querySelector('.card')?.focus(); // Return focus
+    }
+
+    // --- NAVIGATION & INPUTS ---
+
+    // Spatial Navigation Helper
+    function handleNav(key) {
+        const focusable = Array.from(document.querySelectorAll(
+            state.view === 'modal' ? '#modal .btn, #modal input' : 
+            state.view === 'grid' ? '.card, .btn' : ''
+        ));
+        const current = document.activeElement;
+        const idx = focusable.indexOf(current);
+        const cols = state.view === 'grid' ? 4 : 1;
+
+        if (idx === -1) { focusable[0]?.focus(); return; }
+
+        let next = idx;
+        if (key === 'ArrowRight') next = idx + 1;
+        if (key === 'ArrowLeft') next = idx - 1;
+        if (key === 'ArrowDown') next = idx + cols;
+        if (key === 'ArrowUp') next = idx - cols;
+
+        if (next >= 0 && next < focusable.length) focusable[next].focus();
+    }
+
     document.addEventListener('keydown', (e) => {
-        if (isPlaying) {
-            handlePlayerKeys(e);
+        // Player Controls
+        if (state.view === 'player') {
+            const v = document.getElementById('videoEl');
+            if (e.key === 'Enter') v.paused ? v.play() : v.pause();
+            if (e.key === 'ArrowLeft') v.currentTime -= 10;
+            if (e.key === 'ArrowRight') v.currentTime += 10;
+            if (e.key === 'Backspace' || e.key === 'Escape' || e.keyCode === 8) closePlayer();
             return;
         }
 
-        const focused = document.activeElement;
-        if (!focused.classList.contains('card')) return;
+        // Grid/Modal Controls
+        if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+            e.preventDefault();
+            handleNav(e.key);
+        }
+        
+        if (e.key === 'Enter') {
+            const el = document.activeElement;
+            if (el.classList.contains('card')) playVideo(el.dataset.id);
+            if (el.id === 'btn-refresh') loadTrending();
+            if (el.id === 'btn-settings') openSettings();
+            if (el.id === 'btn-save') saveSettings();
+            if (el.id === 'btn-cancel') closeSettings();
+        }
 
-        const cards = Array.from(document.querySelectorAll('.card'));
-        const index = cards.indexOf(focused);
-        const cols = 4; // Matches CSS Grid
-
-        if (index === -1) return;
-
-        switch(e.key) {
-            case 'ArrowRight': 
-                if(index + 1 < cards.length) cards[index + 1].focus(); 
-                break;
-            case 'ArrowLeft': 
-                if(index - 1 >= 0) cards[index - 1].focus(); 
-                break;
-            case 'ArrowDown': 
-                if(index + cols < cards.length) cards[index + cols].focus(); 
-                break;
-            case 'ArrowUp': 
-                if(index - cols >= 0) cards[index - cols].focus(); 
-                break;
-            case 'Enter': 
-                playVideo(focused.dataset.id); 
-                break;
+        if (e.key === 'Backspace' || e.keyCode === 8) {
+             if (state.view === 'modal') closeSettings();
         }
     });
 
-    // --- 5. PLAYER LOGIC ---
-    async function playVideo(id) {
-        const player = document.getElementById('player');
-        const videoEl = document.getElementById('videoElement');
-        const status = document.getElementById('status');
+    // --- SETTINGS LOGIC ---
 
-        status.innerText = "Loading Stream...";
-        
-        try {
-            const data = await robustFetch(`/streams/${id}`);
-            // Find best MP4 (HLS/DASH not supported by basic HTML5 video)
-            const stream = data.videoStreams.find(s => s.format === 'MPEG-4' && s.quality === '1080p') 
-                        || data.videoStreams.find(s => s.format === 'MPEG-4');
-            
-            if (stream) {
-                videoEl.src = stream.url;
-                player.style.display = 'block';
-                videoEl.play();
-                isPlaying = true;
-                videoEl.focus();
-                status.innerText = "Playing";
-            } else {
-                alert("No compatible MP4 stream found.");
-            }
-        } catch(e) {
-            console.error(e);
-            alert("Error loading stream.");
+    function openSettings() {
+        state.view = 'modal';
+        const modal = document.getElementById('modal');
+        document.getElementById('api-input').value = state.api;
+        modal.classList.add('active');
+        document.getElementById('api-input').focus();
+    }
+
+    function closeSettings() {
+        document.getElementById('modal').classList.remove('active');
+        state.view = 'grid';
+        document.getElementById('btn-settings').focus();
+    }
+
+    function saveSettings() {
+        const val = document.getElementById('api-input').value.trim();
+        if (val.startsWith('http')) {
+            state.api = val;
+            localStorage.setItem('piped_api', val);
+            closeSettings();
+            loadTrending();
+        } else {
+            showToast('Invalid URL (must start with http)');
         }
     }
 
-    function handlePlayerKeys(e) {
-        const videoEl = document.getElementById('videoElement');
-        
-        // Back / Escape
-        if (e.keyCode === 8 || e.keyCode === 27 || e.key === 'Back' || e.key === 'Backspace') {
-            e.preventDefault();
-            videoEl.pause();
-            videoEl.src = "";
-            document.getElementById('player').style.display = 'none';
-            isPlaying = false;
-            // Refocus last card
-            const lastCard = document.querySelector('.card:focus') || document.querySelector('.card');
-            if(lastCard) lastCard.focus();
-        }
-        
-        // Play/Pause
-        if (e.key === 'Enter') {
-            videoEl.paused ? videoEl.play() : videoEl.pause();
-        }
+    // Init
+    loadTrending();
 
-        // Seek 10s
-        if (e.key === 'ArrowRight') videoEl.currentTime += 10;
-        if (e.key === 'ArrowLeft') videoEl.currentTime -= 10;
-    }
-
-    init();
 </script>
 </body>
 </html>
